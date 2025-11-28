@@ -1,0 +1,38 @@
+name: Deploy to GKE
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: webapp-cluster-dev
+  REGION: us-central1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Setup GCP
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        
+    - name: Configure Docker
+      run: gcloud auth configure-docker
+      
+    - name: Build and Push
+      run: |
+        docker build -t gcr.io/$PROJECT_ID/webapp:$GITHUB_SHA ./app
+        docker push gcr.io/$PROJECT_ID/webapp:$GITHUB_SHA
+        
+    - name: Deploy
+      run: |
+        cd terraform
+        terraform init
+        terraform apply -var="project_id=$PROJECT_ID" -auto-approve
